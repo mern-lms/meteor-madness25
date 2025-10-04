@@ -24,7 +24,8 @@ const state = {
 
 // ==================== API Configuration ====================
 const API_BASE = window.location.origin;
-const FLASK_API = 'http://localhost:5000';
+// Use same origin serverless API on Vercel
+const FLASK_API = API_BASE;
 
 // ==================== Initialization ====================
 document.addEventListener('DOMContentLoaded', () => {
