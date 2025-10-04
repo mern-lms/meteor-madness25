@@ -5,7 +5,7 @@ const path = require('path');
 require('dotenv').config();
 
 const app = express();
-const PORT = 8080;
+const PORT = process.env.PORT || 8080;
 const NASA_API_KEY = process.env.NASA_API_KEY || 'DEMO_KEY';
 
 // Middleware
@@ -1104,9 +1104,14 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// Start server
-app.listen(PORT, () => {
-    console.log(`🚀 Asteroid Impact Simulator Server running on http://localhost:${PORT}`);
-    console.log(`📡 NASA API Key: ${NASA_API_KEY === 'DEMO_KEY' ? 'DEMO_KEY (limited)' : 'Custom key configured'}`);
-    console.log(`\n🌍 Open http://localhost:${PORT} in your browser to start`);
-});
+// Start server only when run directly (not when imported by serverless)
+if (require.main === module && !process.env.VERCEL) {
+    app.listen(PORT, () => {
+        console.log(`🚀 Asteroid Impact Simulator Server running on http://localhost:${PORT}`);
+        console.log(`📡 NASA API Key: ${NASA_API_KEY === 'DEMO_KEY' ? 'DEMO_KEY (limited)' : 'Custom key configured'}`);
+        console.log(`\n🌍 Open http://localhost:${PORT} in your browser to start`);
+    });
+}
+
+// Export the Express app for serverless usage
+module.exports = app;
