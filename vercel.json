@@ -2,8 +2,8 @@
   "version": 2,
   "builds": [
     {
-      "src": "server.js",
-      "use": "@vercel/node"
+      "src": "app.py",
+      "use": "@vercel/python"
     },
     {
       "src": "public/**/*",
@@ -13,7 +13,7 @@
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/server.js"
+      "destination": "/api/$1"
     },
     {
       "source": "/(.*)",
@@ -37,6 +37,46 @@
           "value": "Content-Type"
         }
       ]
+    }
+  ]
+}
+
+
+
+
+{
+  "version": 3,
+  "name": "meteor-madness25",
+  "builds": [
+    {
+      "src": "frontend/package.json",
+      "use": "@vercel/next",
+      "config": {
+        "distDir": "frontend/.next"
+      }
+    },
+    {
+      "src": "backend-node/api/**/*.js",
+      "use": "@vercel/node"
+    },
+    {
+      "src": "backend-python/api/**/*.py",
+      "use": "@vercel/python"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/api/node/(.*)",
+      "dest": "/backend-node/api/$1"
+    },
+    {
+      "src": "/api/python/(.*)",
+      "dest": "/backend-python/api/$1"
+    },
+    // All other routes go to the frontend
+    {
+      "src": "/(.*)",
+      "dest": "/frontend/$1"
     }
   ]
 }
