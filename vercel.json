@@ -1,82 +1,29 @@
 {
   "version": 2,
+  "name": "meteor-madness25",
   "builds": [
-    {
-      "src": "app.py",
-      "use": "@vercel/python"
-    },
-    {
-      "src": "public/**/*",
-      "use": "@vercel/static"
-    }
+    { "src": "api/index.js", "use": "@vercel/node" },
+    { "src": "api/python.py", "use": "@vercel/python" },
+    { "src": "public/**/*", "use": "@vercel/static" }
   ],
-  "rewrites": [
-    {
-      "source": "/api/(.*)",
-      "destination": "/api/$1"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/public/index.html"
-    }
+  "routes": [
+    { "src": "^/api/calculate/.*", "dest": "/api/python.py" },
+    { "src": "^/api/.*", "dest": "/api/index.js" },
+    { "src": "^/(.*\\.(?:js|css|png|jpg|jpeg|svg|gif|ico|json|map|txt))$", "dest": "/public/$1" },
+    { "src": "^/$", "dest": "/public/index.html" },
+    { "src": "^(?!/api/).*$", "dest": "/public/index.html" }
   ],
   "headers": [
     {
       "source": "/api/(.*)",
       "headers": [
-        {
-          "key": "Access-Control-Allow-Origin",
-          "value": "*"
-        },
-        {
-          "key": "Access-Control-Allow-Methods",
-          "value": "GET, POST, OPTIONS"
-        },
-        {
-          "key": "Access-Control-Allow-Headers",
-          "value": "Content-Type"
-        }
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "GET, POST, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     }
-  ]
-}
-
-
-
-
-{
-  "version": 3,
-  "name": "meteor-madness25",
-  "builds": [
-    {
-      "src": "frontend/package.json",
-      "use": "@vercel/next",
-      "config": {
-        "distDir": "frontend/.next"
-      }
-    },
-    {
-      "src": "backend-node/api/**/*.js",
-      "use": "@vercel/node"
-    },
-    {
-      "src": "backend-python/api/**/*.py",
-      "use": "@vercel/python"
-    }
   ],
-  "routes": [
-    {
-      "src": "/api/node/(.*)",
-      "dest": "/backend-node/api/$1"
-    },
-    {
-      "src": "/api/python/(.*)",
-      "dest": "/backend-python/api/$1"
-    },
-    // All other routes go to the frontend
-    {
-      "src": "/(.*)",
-      "dest": "/frontend/$1"
-    }
-  ]
+  "env": {
+    "NASA_API_KEY": "@nasa_api_key"
+  }
 }
