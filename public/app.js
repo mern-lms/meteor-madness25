@@ -7,37 +7,6 @@ let orbitLines = []; // Array to store all orbit lines
 let selectedAsteroid = null; // Currently selected asteroid
 let allAsteroidsData = []; // Store all asteroid data from NASA
 
-// ==================== Intro Screen Management ====================
-function showIntroScreen() {
-    const introScreen = document.getElementById('intro-screen');
-    if (introScreen) {
-        introScreen.style.display = 'flex';
-        
-        // Hide intro screen after 5 seconds
-        setTimeout(() => {
-            introScreen.style.transition = 'opacity 1s ease-out';
-            introScreen.style.opacity = '0';
-            
-            setTimeout(() => {
-                introScreen.style.display = 'none';
-                // Initialize the main application after intro
-                initializeApp();
-            }, 1000);
-        }, 5000);
-    }
-}
-
-function initializeApp() {
-    // Initialize Three.js and start the main application
-    initThreeJS();
-    initEventListeners();
-    loadNASAStats();
-    loadFeaturedAsteroids();
-    loadAllAsteroids();
-    updateSliderValues();
-    initNewResourcesEventListeners();
-}
-
 const state = {
     diameter: 100,
     velocity: 20,
@@ -54,22 +23,24 @@ const state = {
 };
 
 // ==================== API Configuration ====================
-const API_BASE = 'http://localhost:8080';  // Node.js API server
-const FLASK_API = 'http://localhost:5000'; // Flask server
+const API_BASE = window.location.origin;
+// Use same origin serverless API on Vercel
+const FLASK_API = API_BASE;
 
-// ==================== Initialize App ====================
+// ==================== Initialization ====================
 document.addEventListener('DOMContentLoaded', () => {
-    // Show intro screen first
-    showIntroScreen();
+    initThreeJS();
+    initEventListeners();
+    loadNASAStats();
+    loadFeaturedAsteroids();
+    loadAllAsteroids(); // Load all asteroids from NASA
+    updateSliderValues();
+    initNewResourcesEventListeners();
 });
 
 // ==================== Three.js 3D Visualization ====================
 function initThreeJS() {
     const container = document.getElementById('canvas-container');
-    if (!container) {
-        console.error('Canvas container not found');
-        return;
-    }
     
     // Scene - Black space background like NASA
     scene = new THREE.Scene();
@@ -153,7 +124,7 @@ function initThreeJS() {
     }
     const earthOrbitGeometry = new THREE.BufferGeometry().setFromPoints(earthOrbitPoints);
     const earthOrbitMaterial = new THREE.LineBasicMaterial({
-        color: 0x404040,
+        color: 0x00aaff,
         transparent: true,
         opacity: 0.4
     });
@@ -172,7 +143,9 @@ function initThreeJS() {
     }
     const venusOrbitGeometry = new THREE.BufferGeometry().setFromPoints(venusOrbitPoints);
     const venusOrbitMaterial = new THREE.LineBasicMaterial({
-        color: 0x000000
+        color: 0xffaa88,
+        transparent: true,
+        opacity: 0.2
     });
     const venusOrbitLine = new THREE.Line(venusOrbitGeometry, venusOrbitMaterial);
     scene.add(venusOrbitLine);
@@ -189,7 +162,7 @@ function initThreeJS() {
     }
     const marsOrbitGeometry = new THREE.BufferGeometry().setFromPoints(marsOrbitPoints);
     const marsOrbitMaterial = new THREE.LineBasicMaterial({
-        color: 0xffffff,
+        color: 0xff6644,
         transparent: true,
         opacity: 0.2
     });
@@ -281,12 +254,13 @@ function createRealisticAsteroid(baseSize) {
     }
     
     const texture = new THREE.CanvasTexture(canvas);
+    
     const material = new THREE.MeshStandardMaterial({
         map: texture,
         roughness: 0.9,
         metalness: 0.1,
-        color: 0xffffff,
-        emissive: 0x000000,
+        color: 0x8b7355,
+        emissive: 0x331100,
         emissiveIntensity: 0.1
     });
     
@@ -322,7 +296,7 @@ function createOrbitPath() {
     );
     
     const material = new THREE.LineBasicMaterial({
-        color: 0x404040,
+        color: 0xfbbf24,
         transparent: true,
         opacity: 0.6
     });
@@ -378,30 +352,8 @@ function animate() {
     //     earth.position.z = 10 * Math.sin(time);
     // }
     
-    // Animate impact points (pulsing effect)
-    const time = Date.now() * 0.001;
-    scene.traverse((object) => {
-        if (object.userData && object.userData.isImpactPoint) {
-            // Pulsing animation for impact markers
-            const pulseScale = 1 + Math.sin(time * 5) * 0.3;
-            object.scale.setScalar(pulseScale);
-            
-            // Color pulsing
-            if (object.material) {
-                const intensity = 0.5 + Math.sin(time * 3) * 0.5;
-                object.material.emissiveIntensity = intensity;
-            }
-        }
-    });
-    
-    // Animate asteroid rotation
-    asteroidObjects.forEach(asteroidObj => {
-        if (asteroidObj.mesh && asteroidObj.mesh.rotationSpeed) {
-            asteroidObj.mesh.rotation.x += asteroidObj.mesh.rotationSpeed.x;
-            asteroidObj.mesh.rotation.y += asteroidObj.mesh.rotationSpeed.y;
-            asteroidObj.mesh.rotation.z += asteroidObj.mesh.rotationSpeed.z;
-        }
-    });
+    // Asteroids remain static at their calculated orbital positions
+    // (In NASA Eyes, they also animate along orbits, but we keep them static for clarity)
     
     // Update controls
     if (controls) {
@@ -411,71 +363,6 @@ function animate() {
     renderer.render(scene, camera);
 }
 
-
-// ==================== NASA Enhanced Data Integration ====================
-
-async function fetchNASAHorizonsData(asteroidId) {
-    try {
-        // Fetch detailed orbital elements from NASA JPL Horizons via our API
-        const response = await fetch(`${API_BASE}/api/horizons/${asteroidId}`);
-        if (response.ok) {
-            return await response.json();
-        }
-    } catch (error) {
-        console.warn(`Could not fetch Horizons data for ${asteroidId}:`, error);
-    }
-    return null;
-}
-
-async function calculateImpactProbability(asteroidData) {
-    try {
-        // Use NASA's close approach data and Sentry data to calculate impact probability
-        let impactProb = 0;
-        let impactYear = null;
-        
-        // Check Sentry data first (most accurate for impact risk)
-        if (asteroidData.sentryData && asteroidData.sentryData.impactProbability) {
-            impactProb = asteroidData.sentryData.impactProbability;
-            impactYear = asteroidData.sentryData.impactYear;
-        }
-        
-        // Check close approach data
-        if (asteroidData.close_approach_data && asteroidData.close_approach_data.length > 0) {
-            const closeApproach = asteroidData.close_approach_data[0];
-            const distanceAU = parseFloat(closeApproach.miss_distance?.astronomical) || 999;
-            
-            // Calculate rough impact probability based on distance and size
-            if (distanceAU < 0.05) { // Very close approach
-                const size = getAsteroidDiameter(asteroidData);
-                if (size > 100) { // Large asteroid
-                    impactProb = Math.max(impactProb, 1e-6); // Minimum detectable risk
-                }
-            }
-        }
-        
-        return {
-            probability: impactProb,
-            year: impactYear,
-            riskLevel: impactProb > 1e-4 ? 'HIGH' : impactProb > 1e-6 ? 'MEDIUM' : 'LOW'
-        };
-    } catch (error) {
-        console.warn('Error calculating impact probability:', error);
-        return {
-            probability: 0,
-            year: null,
-            riskLevel: 'LOW'
-        };
-    }
-}
-
-function getAsteroidDiameter(asteroidData) {
-    if (asteroidData.estimated_diameter && asteroidData.estimated_diameter.meters) {
-        const min = asteroidData.estimated_diameter.meters.estimated_diameter_min;
-        const max = asteroidData.estimated_diameter.meters.estimated_diameter_max;
-        return (min + max) / 2;
-    }
-    return 100; // Default
-}
 
 // ==================== Asteroid Loading & Visualization ====================
 
@@ -534,16 +421,7 @@ async function loadAllAsteroids() {
             const orbit = calculateOrbitFromNASAData(a, 0);
             return orbit.realDistanceAU || 0;
         })).toFixed(2)} AU`);
-        
-        // Enhanced asteroid creation with impact analysis
-        try {
-            await createEnhancedAsteroidObjects(asteroidsToShow);
-            console.log('✅ Enhanced asteroid visualization loaded successfully');
-        } catch (enhancedError) {
-            console.warn('⚠️ Enhanced visualization failed, falling back to standard:', enhancedError);
-            // Fallback to standard asteroid creation
-            createAsteroidObjects(asteroidsToShow);
-        }
+        createAsteroidObjects(asteroidsToShow);
         
         // Update UI
         updateAsteroidBrowser(allAsteroidsData);
@@ -705,180 +583,6 @@ function displayImpactRiskSummary(asteroids) {
     }
 }
 
-async function createEnhancedAsteroidObjects(asteroids) {
-    // Clear existing asteroids
-    asteroidObjects.forEach(obj => {
-        scene.remove(obj.mesh);
-        if (obj.orbit) scene.remove(obj.orbit);
-    });
-    asteroidObjects = [];
-    orbitLines = [];
-    
-    let impactRiskCount = 0;
-    let highRiskCount = 0;
-    
-    for (let index = 0; index < asteroids.length; index++) {
-        const asteroidData = asteroids[index];
-        
-        // Calculate enhanced impact probability
-        const impactAnalysis = await calculateImpactProbability(asteroidData);
-        asteroidData.impactAnalysis = impactAnalysis;
-        
-        if (impactAnalysis.probability > 0) {
-            impactRiskCount++;
-            if (impactAnalysis.riskLevel === 'HIGH') {
-                highRiskCount++;
-            }
-        }
-        
-        // Calculate orbit parameters
-        const orbitData = calculateOrbitFromNASAData(asteroidData, index);
-        
-        // Calculate initial 3D position using orbital mechanics
-        const initialPosition = calculateInitialAsteroidPosition(asteroidData, orbitData, index);
-        
-        // Log enhanced data for verification
-        if (index < 5) {
-            console.log(`🌌 Enhanced Asteroid ${asteroidData.name || asteroidData.id}:`, {
-                distance: (orbitData.realDistanceAU?.toFixed(4) || 'N/A') + ' AU',
-                position: `(${initialPosition.x.toFixed(2)}, ${initialPosition.y.toFixed(2)}, ${initialPosition.z.toFixed(2)})`,
-                impactRisk: impactAnalysis.riskLevel,
-                impactProb: impactAnalysis.probability.toExponential(2),
-                orbitalData: asteroidData.orbital_data ? 'YES' : 'NO',
-                inclination: orbitData.inclination?.toFixed(2) + '°'
-            });
-        }
-        
-        // Create enhanced asteroid visualization
-        const size = getAsteroidSize(asteroidData);
-        const geometry = new THREE.SphereGeometry(size, 16, 16); // Higher detail
-        
-        // Enhanced NASA Eyes-style coloring with impact risk indication
-        let color, emissive, emissiveIntensity;
-        
-        if (impactAnalysis.riskLevel === 'HIGH') {
-            // High impact risk: pulsing bright red
-            color = 0xff0000;
-            emissive = 0xff0000;
-            emissiveIntensity = 0.8;
-        } else if (asteroidData.is_potentially_hazardous_asteroid) {
-            // Hazardous asteroids: bright red/orange
-            color = 0xff3333;
-            emissive = 0x440000;
-            emissiveIntensity = 0.4;
-        } else if (asteroidData.sentryData && asteroidData.sentryData.impactProbability > 0) {
-            // Sentry objects: bright orange
-            color = 0xff8800;
-            emissive = 0x442200;
-            emissiveIntensity = 0.3;
-        } else if (orbitData.realDistanceAU && orbitData.realDistanceAU < 1.3) {
-            // Close asteroids: bright blue
-            color = 0xffffff;
-            emissive = 0x1a1a1a;
-            emissiveIntensity = 0.2;
-        } else {
-            // Regular asteroids: white/cyan
-            color = 0xffffff;
-            emissive = 0x404040;
-            emissiveIntensity = 0.1;
-        }
-        
-        const material = new THREE.MeshBasicMaterial({
-            color: color,
-            transparent: true,
-            opacity: 0.9,
-            emissive: emissive,
-            emissiveIntensity: emissiveIntensity
-        });
-        
-        const mesh = new THREE.Mesh(geometry, material);
-        
-        // Enhanced user data with impact analysis
-        mesh.userData = {
-            asteroidData: asteroidData,
-            asteroidId: asteroidData.id,
-            impactAnalysis: impactAnalysis,
-            orbitData: orbitData
-        };
-        
-        // Add rotation for realism
-        mesh.rotationSpeed = {
-            x: (Math.random() - 0.5) * 0.01,
-            y: (Math.random() - 0.5) * 0.01,
-            z: (Math.random() - 0.5) * 0.01
-        };
-        
-        // Use the calculated initial position
-        mesh.position.set(initialPosition.x, initialPosition.y, initialPosition.z);
-        scene.add(mesh);
-        
-        // Create enhanced elliptical orbit with impact prediction
-        const orbitGroup = createEllipticalOrbit(orbitData, asteroidData, index, initialPosition);
-        if (orbitGroup) {
-            scene.add(orbitGroup);
-        }
-        
-        // Store reference
-        asteroidObjects.push({
-            mesh: mesh,
-            orbit: orbitGroup,
-            data: asteroidData,
-            impactAnalysis: impactAnalysis
-        });
-    }
-    
-    // Update impact statistics in UI
-    updateImpactStatistics(impactRiskCount, highRiskCount, asteroids.length);
-    
-    console.log(`🚨 Impact Risk Summary: ${impactRiskCount} asteroids with impact risk (${highRiskCount} high risk)`);
-}
-
-function updateImpactStatistics(impactRiskCount, highRiskCount, totalCount) {
-    // Update the orbital info display with impact statistics
-    const orbitInfo = document.getElementById('orbit-info');
-    if (orbitInfo) {
-        orbitInfo.innerHTML = `
-            <div class="flex flex-col sm:flex-row gap-2 sm:gap-4 text-xs sm:text-sm">
-                <span>🌌 ${totalCount} asteroids tracked</span>
-                <span class="text-orange-400">⚠️ ${impactRiskCount} with impact risk</span>
-                <span class="text-red-400">🚨 ${highRiskCount} high risk</span>
-            </div>
-        `;
-    }
-    
-    // Update legend in the 3D view
-    updateAsteroidLegend();
-}
-
-function updateAsteroidLegend() {
-    // Find the legend container in the 3D view
-    const legendContainer = document.querySelector('.flex.items-center.space-x-2.sm\\:space-x-4');
-    if (legendContainer) {
-        legendContainer.innerHTML = `
-            <div class="flex items-center space-x-1 sm:space-x-2">
-                <div class="w-2 h-2 sm:w-3 sm:h-3 bg-blue-500 rounded-full"></div>
-                <span>Earth</span>
-            </div>
-            <div class="flex items-center space-x-1 sm:space-x-2">
-                <div class="w-2 h-2 sm:w-3 sm:h-3 bg-red-500 rounded-full animate-pulse"></div>
-                <span>High Risk</span>
-            </div>
-            <div class="flex items-center space-x-1 sm:space-x-2">
-                <div class="w-2 h-2 sm:w-3 sm:h-3 bg-orange-500 rounded-full"></div>
-                <span>PHA</span>
-            </div>
-            <div class="flex items-center space-x-1 sm:space-x-2">
-                <div class="w-2 h-2 sm:w-3 sm:h-3 bg-cyan-400 rounded-full"></div>
-                <span>NEO</span>
-            </div>
-            <div class="flex items-center space-x-1 sm:space-x-2">
-                <div class="w-2 h-2 sm:w-3 sm:h-3 bg-yellow-500 rounded-full opacity-60"></div>
-                <span>Impact Point</span>
-            </div>
-        `;
-    }
-}
-
 function createAsteroidObjects(asteroids) {
     // Clear existing asteroids
     asteroidObjects.forEach(obj => {
@@ -923,12 +627,12 @@ function createAsteroidObjects(asteroids) {
             emissive = 0x442200;
         } else if (orbitData.realDistanceAU && orbitData.realDistanceAU < 1.3) {
             // Close asteroids: bright blue
-            color = 0xffffff;
-            emissive = 0x1a1a1a;
+            color = 0x00aaff;
+            emissive = 0x002244;
         } else {
             // Regular asteroids: white/cyan
-            color = 0xffffff;
-            emissive = 0x404040;
+            color = 0x88ccff;
+            emissive = 0x001122;
         }
         
         const material = new THREE.MeshBasicMaterial({
@@ -1152,7 +856,7 @@ function createEllipticalOrbit(orbitData, asteroidData, index, asteroidPosition)
     
     const orbitalData = asteroidData.orbital_data || {};
     const points = [];
-    const segments = 256; // Higher resolution for better visual quality
+    const segments = 128; // Higher resolution for better visual quality
     
     // Use the SAME orbital elements as asteroid positioning for perfect connection
     const semiMajorAxis = orbitData.realDistanceAU || orbitData.distance || 1.5; // AU
@@ -1174,12 +878,6 @@ function createEllipticalOrbit(orbitData, asteroidData, index, asteroidPosition)
     } else {
         longitudeOfAscendingNode = (index * 0.2) % (2 * Math.PI); // Same as asteroid positioning
     }
-    
-    // Calculate Earth's position for impact trajectory
-    const earthPosition = { x: 10, y: 0, z: 0 }; // Earth at 1 AU
-    let impactPoint = null;
-    let closestDistance = Infinity;
-    let impactTrueAnomaly = null;
     
     // Generate ellipse points using EXACT same orbital mechanics as asteroid positioning
     for (let i = 0; i <= segments; i++) {
@@ -1218,27 +916,9 @@ function createEllipticalOrbit(orbitData, asteroidData, index, asteroidPosition)
         
         // Apply SAME scaling as asteroid positioning (1 AU = 10 units)
         const scale = 10;
-        const point = new THREE.Vector3(x3 * scale, y3 * scale, z3 * scale);
-        points.push(point);
-        
-        // Check for potential Earth impact (closest approach)
-        const distanceToEarth = Math.sqrt(
-            Math.pow(point.x - earthPosition.x, 2) +
-            Math.pow(point.y - earthPosition.y, 2) +
-            Math.pow(point.z - earthPosition.z, 2)
-        );
-        
-        if (distanceToEarth < closestDistance) {
-            closestDistance = distanceToEarth;
-            impactPoint = point.clone();
-            impactTrueAnomaly = trueAnomaly;
-        }
+        points.push(new THREE.Vector3(x3 * scale, y3 * scale, z3 * scale));
     }
     
-    // Create orbit line group
-    const orbitGroup = new THREE.Group();
-    
-    // Main orbit line
     const geometry = new THREE.BufferGeometry().setFromPoints(points);
     
     // Enhanced NASA Eyes-style coloring and visibility
@@ -1247,19 +927,19 @@ function createEllipticalOrbit(orbitData, asteroidData, index, asteroidPosition)
     if (asteroidData.is_potentially_hazardous_asteroid) {
         // Hazardous asteroids: bright red/orange orbits
         color = 0xff4444;
-        opacity = 0.7;
+        opacity = 0.6;
     } else if (asteroidData.sentryData && asteroidData.sentryData.impactProbability > 0) {
         // Sentry objects: yellow/orange orbits
         color = 0xffaa00;
-        opacity = 0.6;
+        opacity = 0.5;
     } else if (orbitData.realDistanceAU && orbitData.realDistanceAU < 1.3) {
         // Close asteroids: blue orbits
-        color = 0xffffff;
-        opacity = 0.5;
+        color = 0x00aaff;
+        opacity = 0.4;
     } else {
         // Regular asteroids: dim white/gray orbits
-        color = 0xffffff;
-        opacity = 0.3;
+        color = 0x888888;
+        opacity = 0.2;
     }
     
     // Create material with NASA Eyes styling
@@ -1273,98 +953,17 @@ function createEllipticalOrbit(orbitData, asteroidData, index, asteroidPosition)
     });
     
     const orbitLine = new THREE.Line(geometry, material);
-    orbitGroup.add(orbitLine);
-    
-    // Add impact point visualization if close approach detected
-    if (impactPoint && closestDistance < 2.0) { // Within 2 units (0.2 AU) of Earth
-        // Create impact point marker
-        const impactGeometry = new THREE.SphereGeometry(0.3, 8, 8);
-        const impactMaterial = new THREE.MeshBasicMaterial({
-            color: 0xff0000,
-            emissive: 0xff0000,
-            emissiveIntensity: 0.8,
-            transparent: true,
-            opacity: 0.9
-        });
-        const impactMarker = new THREE.Mesh(impactGeometry, impactMaterial);
-        impactMarker.position.copy(impactPoint);
-        orbitGroup.add(impactMarker);
-        
-        // Add pulsing animation to impact point
-        impactMarker.userData = {
-            isImpactPoint: true,
-            originalScale: 1,
-            pulseSpeed: 0.05
-        };
-        
-        // Create connection line from asteroid to impact point
-        const connectionPoints = [asteroidPosition, impactPoint];
-        const connectionGeometry = new THREE.BufferGeometry().setFromPoints(connectionPoints);
-        const connectionMaterial = new THREE.LineDashedMaterial({
-            color: 0xff4444,
-            transparent: true,
-            opacity: 0.8,
-            dashSize: 0.5,
-            gapSize: 0.3,
-            linewidth: 2
-        });
-        const connectionLine = new THREE.Line(connectionGeometry, connectionMaterial);
-        connectionLine.computeLineDistances(); // Required for dashed lines
-        orbitGroup.add(connectionLine);
-        
-        // Add impact trajectory prediction using NASA's close approach data
-        if (asteroidData.close_approach_data && asteroidData.close_approach_data.length > 0) {
-            const closeApproach = asteroidData.close_approach_data[0];
-            const approachDate = new Date(closeApproach.close_approach_date);
-            
-            // Create trajectory arc showing approach path
-            const trajectoryPoints = [];
-            const trajectorySegments = 32;
-            
-            for (let i = 0; i <= trajectorySegments; i++) {
-                const t = i / trajectorySegments;
-                const point = new THREE.Vector3().lerpVectors(asteroidPosition, impactPoint, t);
-                
-                // Add slight curve based on gravitational influence
-                const earthGravityInfluence = Math.sin(t * Math.PI) * 0.5;
-                point.y += earthGravityInfluence;
-                
-                trajectoryPoints.push(point);
-            }
-            
-            const trajectoryGeometry = new THREE.BufferGeometry().setFromPoints(trajectoryPoints);
-            const trajectoryMaterial = new THREE.LineBasicMaterial({
-                color: 0xffaa00,
-                transparent: true,
-                opacity: 0.6,
-                linewidth: 3
-            });
-            const trajectoryLine = new THREE.Line(trajectoryGeometry, trajectoryMaterial);
-            orbitGroup.add(trajectoryLine);
-        }
-        
-        // Store impact data for UI display
-        orbitGroup.userData.impactData = {
-            hasImpactRisk: true,
-            closestDistance: closestDistance,
-            impactPoint: impactPoint,
-            impactTrueAnomaly: impactTrueAnomaly,
-            distanceAU: closestDistance / 10, // Convert back to AU
-            riskLevel: closestDistance < 1.0 ? 'HIGH' : closestDistance < 1.5 ? 'MEDIUM' : 'LOW'
-        };
-    }
     
     // Store orbital data for future reference
-    orbitGroup.userData = {
+    orbitLine.userData = {
         asteroidData: asteroidData,
         orbitData: orbitData,
         semiMajorAxis: semiMajorAxis,
         eccentricity: eccentricity,
-        inclination: inclination,
-        ...orbitGroup.userData
+        inclination: inclination
     };
     
-    return orbitGroup;
+    return orbitLine;
 }
 
 function getAsteroidSize(asteroidData) {
@@ -1498,12 +1097,12 @@ function selectAsteroid(asteroidData) {
                 obj.orbit.material.color.setHex(0xffff00);
             }
         } else {
-            const color = obj.data.is_potentially_hazardous_asteroid ? 0xff3333 : 0xffffff;
+            const color = obj.data.is_potentially_hazardous_asteroid ? 0xff3333 : 0x00aaff;
             obj.mesh.material.color.setHex(color);
             obj.mesh.material.opacity = 0.8;
             if (obj.orbit) {
                 obj.orbit.material.opacity = 0.2;
-                const orbitColor = obj.data.is_potentially_hazardous_asteroid ? 0xff6666 : 0xffffff;
+                const orbitColor = obj.data.is_potentially_hazardous_asteroid ? 0xff6666 : 0x4488ff;
                 obj.orbit.material.color.setHex(orbitColor);
             }
         }
@@ -1752,11 +1351,11 @@ function closeAsteroidDetails() {
     
     // Reset asteroid highlighting
     asteroidObjects.forEach(obj => {
-        const color = obj.data.is_potentially_hazardous_asteroid ? 0xff4444 : 0xffffff;
+        const color = obj.data.is_potentially_hazardous_asteroid ? 0xff4444 : 0x44ff44;
         obj.mesh.material.color.setHex(color);
         obj.mesh.material.emissiveIntensity = 0.3;
         obj.orbit.material.opacity = 0.3;
-        obj.orbit.material.color.setHex(0xffffff);
+        obj.orbit.material.color.setHex(0x888888);
     });
     
     selectedAsteroid = null;
@@ -1970,239 +1569,7 @@ function initEventListeners() {
         toggleFullscreen();
     });
     
-    // Mobile menu toggle
-    const mobileMenuBtn = document.getElementById('mobile-menu-btn');
-    const mobileMenu = document.getElementById('mobile-menu');
-    
-    if (mobileMenuBtn && mobileMenu) {
-        mobileMenuBtn.addEventListener('click', () => {
-            mobileMenu.classList.toggle('hidden');
-            // Toggle menu icon
-            const icon = mobileMenuBtn.querySelector('i');
-            if (mobileMenu.classList.contains('hidden')) {
-                icon.setAttribute('data-lucide', 'menu');
-            } else {
-                icon.setAttribute('data-lucide', 'x');
-            }
-            // Refresh lucide icons
-            if (typeof lucide !== 'undefined') {
-                lucide.createIcons();
-            }
-        });
-    }
-    
-    // Mobile menu button handlers (duplicate functionality for mobile buttons)
-    const mobileButtons = [
-        { id: 'btn-defend-earth-mobile', handler: startDefendEarthMode },
-        { id: 'btn-stories-mobile', handler: () => console.log('Stories clicked') },
-        { id: 'btn-share-mobile', handler: () => console.log('Share clicked') },
-        { id: 'btn-library-mobile', handler: () => console.log('Library clicked') }
-    ];
-    
-    mobileButtons.forEach(({ id, handler }) => {
-        const btn = document.getElementById(id);
-        if (btn) {
-            btn.addEventListener('click', () => {
-                handler();
-                // Close mobile menu after selection
-                mobileMenu.classList.add('hidden');
-                const icon = mobileMenuBtn.querySelector('i');
-                icon.setAttribute('data-lucide', 'menu');
-                if (typeof lucide !== 'undefined') {
-                    lucide.createIcons();
-                }
-            });
-        }
-    });
-    
-    // Add click interaction for 3D asteroids
-    if (typeof renderer !== 'undefined' && renderer.domElement) {
-        const canvas = renderer.domElement;
-        const raycaster = new THREE.Raycaster();
-        const mouse = new THREE.Vector2();
-    
-    canvas.addEventListener('click', (event) => {
-        // Calculate mouse position in normalized device coordinates
-        const rect = canvas.getBoundingClientRect();
-        mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-        mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-        
-        // Update the raycaster
-        raycaster.setFromCamera(mouse, camera);
-        
-        // Check for intersections with asteroids
-        const asteroidMeshes = asteroidObjects.map(obj => obj.mesh);
-        const intersects = raycaster.intersectObjects(asteroidMeshes);
-        
-        if (intersects.length > 0) {
-            const selectedMesh = intersects[0].object;
-            const asteroidData = selectedMesh.userData.asteroidData;
-            const impactAnalysis = selectedMesh.userData.impactAnalysis;
-            
-            // Display asteroid information
-            displayAsteroidInfo(asteroidData, impactAnalysis);
-            
-            // Highlight selected asteroid
-            highlightAsteroid(selectedMesh);
-        }
-    });
-    } else {
-        console.warn('⚠️ Renderer not available for click interactions');
-    }
-    
 }
-
-function displayAsteroidInfo(asteroidData, impactAnalysis) {
-    // Create or update asteroid info panel
-    let infoPanel = document.getElementById('asteroid-info-panel');
-    if (!infoPanel) {
-        infoPanel = document.createElement('div');
-        infoPanel.id = 'asteroid-info-panel';
-        infoPanel.className = 'fixed top-20 right-4 bg-gray-900/95 backdrop-blur-sm border border-gray-700 rounded-xl p-4 max-w-sm z-40 shadow-2xl';
-        document.body.appendChild(infoPanel);
-    }
-    
-    const diameter = getAsteroidDiameter(asteroidData);
-    const closeApproach = asteroidData.close_approach_data?.[0];
-    
-    infoPanel.innerHTML = `
-        <div class="flex justify-between items-start mb-3">
-            <h3 class="text-lg font-bold text-white">${asteroidData.name || asteroidData.id}</h3>
-            <button onclick="closeAsteroidInfo()" class="text-gray-400 hover:text-white">
-                <i data-lucide="x" class="w-5 h-5"></i>
-            </button>
-        </div>
-        
-        <div class="space-y-3 text-sm">
-            <div class="grid grid-cols-2 gap-2">
-                <div>
-                    <span class="text-gray-400">Diameter:</span>
-                    <div class="text-white font-semibold">${diameter.toFixed(0)}m</div>
-                </div>
-                <div>
-                    <span class="text-gray-400">Risk Level:</span>
-                    <div class="font-semibold ${impactAnalysis.riskLevel === 'HIGH' ? 'text-red-400' : 
-                        impactAnalysis.riskLevel === 'MEDIUM' ? 'text-orange-400' : 'text-green-400'}">
-                        ${impactAnalysis.riskLevel}
-                    </div>
-                </div>
-            </div>
-            
-            ${impactAnalysis.probability > 0 ? `
-                <div class="bg-red-900/30 border border-red-700 rounded-lg p-3">
-                    <div class="text-red-400 font-semibold mb-1">⚠️ Impact Risk Detected</div>
-                    <div class="text-xs text-gray-300">
-                        Probability: ${impactAnalysis.probability.toExponential(2)}
-                        ${impactAnalysis.year ? `<br>Potential Year: ${impactAnalysis.year}` : ''}
-                    </div>
-                </div>
-            ` : ''}
-            
-            ${closeApproach ? `
-                <div class="bg-blue-900/30 border border-blue-700 rounded-lg p-3">
-                    <div class="text-blue-400 font-semibold mb-1">🌍 Close Approach</div>
-                    <div class="text-xs text-gray-300">
-                        Date: ${new Date(closeApproach.close_approach_date).toLocaleDateString()}<br>
-                        Distance: ${parseFloat(closeApproach.miss_distance?.astronomical || 0).toFixed(4)} AU<br>
-                        Velocity: ${parseFloat(closeApproach.relative_velocity?.kilometers_per_hour || 0).toFixed(0)} km/h
-                    </div>
-                </div>
-            ` : ''}
-            
-            <div class="flex gap-2 pt-2">
-                ${asteroidData.is_potentially_hazardous_asteroid ? 
-                    '<span class="px-2 py-1 bg-red-600 text-white text-xs rounded">PHA</span>' : ''}
-                ${asteroidData.sentryData ? 
-                    '<span class="px-2 py-1 bg-orange-600 text-white text-xs rounded">Sentry</span>' : ''}
-                ${asteroidData.is_neo ? 
-                    '<span class="px-2 py-1 bg-blue-600 text-white text-xs rounded">NEO</span>' : ''}
-            </div>
-        </div>
-    `;
-    
-    // Refresh lucide icons
-    if (typeof lucide !== 'undefined') {
-        lucide.createIcons();
-    }
-}
-
-function highlightAsteroid(mesh) {
-    // Reset all asteroid materials
-    asteroidObjects.forEach(obj => {
-        if (obj.mesh.material.emissiveIntensity !== undefined) {
-            obj.mesh.material.emissiveIntensity *= 0.5; // Dim others
-        }
-    });
-    
-    // Highlight selected asteroid
-    if (mesh.material.emissiveIntensity !== undefined) {
-        mesh.material.emissiveIntensity = 1.0; // Brighten selected
-    }
-    
-    // Add selection ring
-    const ringGeometry = new THREE.RingGeometry(mesh.geometry.parameters.radius * 1.5, mesh.geometry.parameters.radius * 2, 32);
-    const ringMaterial = new THREE.MeshBasicMaterial({
-        color: 0xffffff,
-        transparent: true,
-        opacity: 0.8,
-        side: THREE.DoubleSide
-    });
-    const ring = new THREE.Mesh(ringGeometry, ringMaterial);
-    ring.position.copy(mesh.position);
-    ring.lookAt(camera.position);
-    
-    // Remove existing selection ring
-    const existingRing = scene.getObjectByName('selection-ring');
-    if (existingRing) {
-        scene.remove(existingRing);
-    }
-    
-    ring.name = 'selection-ring';
-    scene.add(ring);
-    
-    // Animate ring
-    const animateRing = () => {
-        if (ring.parent) {
-            ring.rotation.z += 0.02;
-            ring.material.opacity = 0.5 + Math.sin(Date.now() * 0.005) * 0.3;
-            requestAnimationFrame(animateRing);
-        }
-    };
-    animateRing();
-}
-
-// Global function to close asteroid info
-window.closeAsteroidInfo = function() {
-    const infoPanel = document.getElementById('asteroid-info-panel');
-    if (infoPanel) {
-        infoPanel.remove();
-    }
-    
-    // Reset asteroid highlighting
-    asteroidObjects.forEach(obj => {
-        if (obj.mesh.material.emissiveIntensity !== undefined) {
-            // Restore original intensity based on asteroid type
-            const asteroidData = obj.mesh.userData.asteroidData;
-            const impactAnalysis = obj.mesh.userData.impactAnalysis;
-            
-            if (impactAnalysis.riskLevel === 'HIGH') {
-                obj.mesh.material.emissiveIntensity = 0.8;
-            } else if (asteroidData.is_potentially_hazardous_asteroid) {
-                obj.mesh.material.emissiveIntensity = 0.4;
-            } else if (asteroidData.sentryData) {
-                obj.mesh.material.emissiveIntensity = 0.3;
-            } else {
-                obj.mesh.material.emissiveIntensity = 0.1;
-            }
-        }
-    });
-    
-    // Remove selection ring
-    const existingRing = scene.getObjectByName('selection-ring');
-    if (existingRing) {
-        scene.remove(existingRing);
-    }
-};
 
 function updateSliderValues() {
     document.getElementById('diameter-value').textContent = state.diameter;
@@ -2268,37 +1635,17 @@ function switchView(view) {
 // ==================== NASA API Integration ====================
 async function loadNASAStats() {
     try {
-        // Try local API first
         const response = await fetch(`${API_BASE}/api/neo/stats`);
         const data = await response.json();
         
         if (data.near_earth_objects) {
             document.getElementById('stat-neos').textContent = 
                 data.near_earth_objects.count.toLocaleString();
-            return;
         }
     } catch (error) {
-        console.error('Error loading NASA stats from local API:', error);
+        console.error('Error loading NASA stats:', error);
+        document.getElementById('stat-neos').textContent = '30k+';
     }
-    
-    try {
-        // Fallback to direct NASA API
-        console.log('Trying direct NASA stats API...');
-        const directResponse = await fetch('https://api.nasa.gov/neo/rest/v1/stats?api_key=DEMO_KEY');
-        if (directResponse.ok) {
-            const directData = await directResponse.json();
-            if (directData.near_earth_objects) {
-                document.getElementById('stat-neos').textContent = 
-                    directData.near_earth_objects.count.toLocaleString();
-                return;
-            }
-        }
-    } catch (directError) {
-        console.error('Direct NASA stats API also failed:', directError);
-    }
-    
-    // Final fallback
-    document.getElementById('stat-neos').textContent = '30,000+';
 }
 
 async function loadFeaturedAsteroids() {
@@ -2330,15 +1677,23 @@ async function loadFeaturedAsteroids() {
 
 function createAsteroidCard(asteroid) {
     const card = document.createElement('div');
-    card.className = 'bg-black border border-white rounded-xl p-4 sm:p-6 hover:scale-105 hover:border-white transition-all duration-300 cursor-pointer relative';
+    card.className = 'bg-gray-900 border border-gray-700 rounded-xl p-4 sm:p-6 hover:scale-105 hover:border-neon-blue transition-all duration-300 cursor-pointer relative overflow-hidden shadow-lg';
     
     const diameter = ((asteroid.diameter_min + asteroid.diameter_max) / 2).toFixed(0);
     const approachDate = new Date(asteroid.close_approach_date);
     const isRecent = (approachDate - new Date()) < 30 * 24 * 60 * 60 * 1000; // Within 30 days
     
+    // Determine threat level for color coding
+    const threatLevel = asteroid.is_hazardous ? 'high' : (diameter > 100 ? 'medium' : 'low');
+    const threatColors = {
+        high: 'from-red-600 to-red-700',
+        medium: 'from-yellow-600 to-yellow-700',
+        low: 'from-blue-600 to-blue-700'
+    };
+    
     card.innerHTML = `
         <!-- Threat Level Indicator -->
-        <div class="absolute top-0 right-0 w-16 h-16 bg-white rounded-bl-full"></div>
+        <div class="absolute top-0 right-0 w-16 h-16 bg-gradient-to-bl ${threatColors[threatLevel]} rounded-bl-full opacity-50"></div>
         
         <!-- Header Section -->
         <div class="flex items-start justify-between mb-4 relative z-10">
@@ -2346,46 +1701,46 @@ function createAsteroidCard(asteroid) {
                 <h3 class="font-bold text-base sm:text-lg text-white truncate orbitron">${asteroid.name}</h3>
                 <div class="flex items-center space-x-2 mt-1">
                     ${asteroid.is_hazardous ? 
-                        '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-white text-black border border-white"><i data-lucide="alert-triangle" class="w-3 h-3 mr-1"></i>Hazardous</span>' : 
-                        '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-white text-black border border-white"><i data-lucide="check-circle" class="w-3 h-3 mr-1"></i>Safe</span>'
+                        '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-red-600 text-white border border-red-500"><i data-lucide="alert-triangle" class="w-3 h-3 mr-1"></i>Hazardous</span>' : 
+                        '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-green-600 text-white border border-green-500"><i data-lucide="check-circle" class="w-3 h-3 mr-1"></i>Safe</span>'
                     }
-                    ${isRecent ? '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-white text-black border border-white"><i data-lucide="clock" class="w-3 h-3 mr-1"></i>Soon</span>' : ''}
+                    ${isRecent ? '<span class="inline-flex items-center px-2 py-1 rounded-full text-xs bg-orange-600 text-white border border-orange-500"><i data-lucide="clock" class="w-3 h-3 mr-1"></i>Soon</span>' : ''}
                 </div>
             </div>
         </div>
         
         <!-- Stats Grid -->
         <div class="grid grid-cols-2 gap-3 mb-4">
-            <div class="bg-black border border-white rounded-lg p-3 text-center">
+            <div class="bg-gray-800 border border-gray-600 rounded-lg p-3 text-center">
                 <div class="flex items-center justify-center mb-1">
-                    <i data-lucide="circle" class="w-4 h-4 text-white mr-1"></i>
-                    <span class="text-xs text-white">Size</span>
+                    <i data-lucide="circle" class="w-4 h-4 text-neon-blue mr-1"></i>
+                    <span class="text-xs text-gray-300">Size</span>
                 </div>
-                <div class="text-lg font-bold text-white orbitron">${diameter}m</div>
+                <div class="text-lg font-bold text-neon-blue orbitron">${diameter}m</div>
             </div>
-            <div class="bg-black border border-white rounded-lg p-3 text-center">
+            <div class="bg-gray-800 border border-gray-600 rounded-lg p-3 text-center">
                 <div class="flex items-center justify-center mb-1">
-                    <i data-lucide="zap" class="w-4 h-4 text-white mr-1"></i>
-                    <span class="text-xs text-white">Speed</span>
+                    <i data-lucide="zap" class="w-4 h-4 text-neon-purple mr-1"></i>
+                    <span class="text-xs text-gray-300">Speed</span>
                 </div>
-                <div class="text-lg font-bold text-white orbitron">${asteroid.velocity.toFixed(1)}</div>
-                <div class="text-xs text-white">km/s</div>
+                <div class="text-lg font-bold text-neon-purple orbitron">${asteroid.velocity.toFixed(1)}</div>
+                <div class="text-xs text-gray-300">km/s</div>
             </div>
         </div>
         
         <!-- Distance & Date -->
         <div class="space-y-2 mb-4">
-            <div class="flex items-center justify-between p-3 bg-black border border-white rounded-lg">
+            <div class="flex items-center justify-between p-3 bg-gray-800 border border-gray-600 rounded-lg">
                 <div class="flex items-center">
-                    <i data-lucide="target" class="w-4 h-4 text-white mr-2"></i>
-                    <span class="text-sm text-white">Miss Distance</span>
+                    <i data-lucide="target" class="w-4 h-4 text-neon-pink mr-2"></i>
+                    <span class="text-sm text-gray-300">Miss Distance</span>
                 </div>
-                <span class="text-sm font-semibold text-white">${(asteroid.miss_distance / 384400).toFixed(2)} LD</span>
+                <span class="text-sm font-semibold text-neon-pink">${(asteroid.miss_distance / 384400).toFixed(2)} LD</span>
             </div>
-            <div class="flex items-center justify-between p-3 bg-black border border-white rounded-lg">
+            <div class="flex items-center justify-between p-3 bg-gray-800 border border-gray-600 rounded-lg">
                 <div class="flex items-center">
-                    <i data-lucide="calendar" class="w-4 h-4 text-white mr-2"></i>
-                    <span class="text-sm text-white">Approach</span>
+                    <i data-lucide="calendar" class="w-4 h-4 text-gray-300 mr-2"></i>
+                    <span class="text-sm text-gray-300">Approach</span>
                 </div>
                 <span class="text-sm font-semibold text-white">${approachDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</span>
             </div>
@@ -2938,7 +2293,7 @@ async function getPlanetaryPositions() {
 
 async function loadCometData() {
     const container = document.getElementById('comet-data');
-    container.innerHTML = '<div class="text-center py-4"><div class="loading-spinner mx-auto"></div><p class="text-white mt-2">Loading NASA comet data...</p></div>';
+    container.innerHTML = '<div class="text-center py-4"><div class="loading-spinner mx-auto"></div><p class="text-gray-400 mt-2">Loading NASA comet data...</p></div>';
     
     try {
         console.log('Fetching comet data from:', `${API_BASE}/api/nasa/comets`);
@@ -2950,46 +2305,36 @@ async function loadCometData() {
         
         const data = await response.json();
         console.log('Comet data received:', data);
-        console.log('Number of comets:', data.count || data.length || 'unknown');
-        console.log('Comets array:', data.comets || data.data || data);
         
         if (data.error) {
             throw new Error(data.message || data.error);
         }
         
-        // Handle different possible API response structures
-        let comets = data.comets || data.data || data;
-        let count = data.count || comets.length || 0;
-        
-        if (!Array.isArray(comets)) {
-            throw new Error('Invalid comet data format received');
-        }
-        
         container.innerHTML = `
-            <div class="mb-3 p-3 bg-black border border-white rounded-lg">
-                <h4 class="font-semibold text-white">Near-Earth Comets</h4>
-                <p class="text-sm text-white">${count} comets loaded</p>
-                <p class="text-xs text-white">NASA Open Data Portal</p>
+            <div class="mb-3 p-3 bg-cyan-600/20 rounded-lg">
+                <h4 class="font-semibold text-cyan-400">Near-Earth Comets</h4>
+                <p class="text-sm text-gray-300">${data.count} comets loaded</p>
+                <p class="text-xs text-gray-400">NASA Open Data Portal</p>
             </div>
             
-            <div class="space-y-2 max-h-96 overflow-y-auto">
-                ${comets.map(comet => `
-                    <div class="p-2 bg-black border border-white rounded">
+            <div class="space-y-2">
+                ${data.comets.slice(0, 8).map(comet => `
+                    <div class="p-2 bg-white/5 rounded">
                         <div class="flex justify-between items-start">
-                            <span class="font-semibold text-sm text-white">${comet.object_name || comet.full_name || comet.name || 'Unknown'}</span>
-                            <span class="text-xs text-white">e=${comet.e?.toFixed(3) || comet.eccentricity?.toFixed(3) || 'N/A'}</span>
+                            <span class="font-semibold text-sm">${comet.object_name || 'Unknown'}</span>
+                            <span class="text-xs text-gray-400">e=${comet.e?.toFixed(3) || 'N/A'}</span>
                         </div>
-                        <div class="text-xs text-white mt-1">
-                            <span>i: ${comet.i_deg?.toFixed(1) || comet.inclination?.toFixed(1) || 'N/A'}°</span>
-                            <span class="ml-2">q: ${comet.q_au_1?.toFixed(3) || comet.perihelion?.toFixed(3) || 'N/A'} AU</span>
-                            ${(comet.p_yr || comet.period) ? `<span class="ml-2">P: ${(comet.p_yr || comet.period).toFixed(1)} yr</span>` : ''}
+                        <div class="text-xs text-gray-400 mt-1">
+                            <span>i: ${comet.i_deg?.toFixed(1) || 'N/A'}°</span>
+                            <span class="ml-2">q: ${comet.q_au_1?.toFixed(3) || 'N/A'} AU</span>
+                            ${comet.p_yr ? `<span class="ml-2">P: ${comet.p_yr.toFixed(1)} yr</span>` : ''}
                         </div>
                     </div>
                 `).join('')}
             </div>
             
-            <div class="mt-3 p-2 bg-black border border-white rounded text-xs text-white">
-                <p>Showing all ${count} comets</p>
+            <div class="mt-3 p-2 bg-white/5 rounded text-xs text-gray-400">
+                <p>Showing first 8 of ${data.count} comets</p>
                 <p>e=eccentricity, i=inclination, q=perihelion, P=period</p>
             </div>
         `;
@@ -2998,60 +2343,7 @@ async function loadCometData() {
     } catch (error) {
         console.error('Error loading comet data:', error);
         
-        // Try direct NASA API as fallback
-        try {
-            console.log('Trying direct NASA API fallback...');
-            const directResponse = await fetch('https://ssd-api.jpl.nasa.gov/sbdb_query.api?fields=full_name,e,i,q,per_y&sb-class=COM&limit=200');
-            if (directResponse.ok) {
-                const directData = await directResponse.json();
-                console.log('Direct NASA API response:', directData);
-                
-                if (directData.data && Array.isArray(directData.data)) {
-                    const comets = directData.data.map(row => ({
-                        object_name: row[0] || 'Unknown',
-                        e: parseFloat(row[1]) || null,
-                        i_deg: parseFloat(row[2]) || null,
-                        q_au_1: parseFloat(row[3]) || null,
-                        p_yr: parseFloat(row[4]) || null
-                    }));
-                    
-                    container.innerHTML = `
-                        <div class="mb-3 p-3 bg-black border border-white rounded-lg">
-                            <h4 class="font-semibold text-white">Near-Earth Comets (Direct NASA API)</h4>
-                            <p class="text-sm text-white">${comets.length} comets loaded</p>
-                            <p class="text-xs text-white">NASA JPL Small-Body Database</p>
-                        </div>
-                        
-                        <div class="space-y-2 max-h-96 overflow-y-auto">
-                            ${comets.map(comet => `
-                                <div class="p-2 bg-black border border-white rounded">
-                                    <div class="flex justify-between items-start">
-                                        <span class="font-semibold text-sm text-white">${comet.object_name}</span>
-                                        <span class="text-xs text-white">e=${comet.e?.toFixed(3) || 'N/A'}</span>
-                                    </div>
-                                    <div class="text-xs text-white mt-1">
-                                        <span>i: ${comet.i_deg?.toFixed(1) || 'N/A'}°</span>
-                                        <span class="ml-2">q: ${comet.q_au_1?.toFixed(3) || 'N/A'} AU</span>
-                                        ${comet.p_yr ? `<span class="ml-2">P: ${comet.p_yr.toFixed(1)} yr</span>` : ''}
-                                    </div>
-                                </div>
-                            `).join('')}
-                        </div>
-                        
-                        <div class="mt-3 p-2 bg-black border border-white rounded text-xs text-white">
-                            <p>Showing all ${comets.length} comets</p>
-                            <p>e=eccentricity, i=inclination, q=perihelion, P=period</p>
-                        </div>
-                    `;
-                    lucide.createIcons();
-                    return;
-                }
-            }
-        } catch (directError) {
-            console.error('Direct NASA API also failed:', directError);
-        }
-        
-        // Final fallback to demo data
+        // Fallback to demo data
         const demoComets = [
             { object_name: "1P/Halley", e: 0.967, i_deg: 162.3, q_au_1: 0.586, p_yr: 75.3 },
             { object_name: "2P/Encke", e: 0.848, i_deg: 11.8, q_au_1: 0.336, p_yr: 3.3 },
@@ -3062,20 +2354,20 @@ async function loadCometData() {
         ];
         
         container.innerHTML = `
-            <div class="mb-3 p-3 bg-black border border-white rounded-lg">
-                <h4 class="font-semibold text-white">Demo Comet Data</h4>
-                <p class="text-sm text-white">${demoComets.length} famous comets (offline mode)</p>
-                <p class="text-xs text-white">Error: ${error.message}</p>
+            <div class="mb-3 p-3 bg-yellow-600/20 rounded-lg border border-yellow-500/30">
+                <h4 class="font-semibold text-yellow-400">Demo Comet Data</h4>
+                <p class="text-sm text-gray-300">${demoComets.length} famous comets (offline mode)</p>
+                <p class="text-xs text-gray-400">Error: ${error.message}</p>
             </div>
             
             <div class="space-y-2">
                 ${demoComets.map(comet => `
-                    <div class="p-3 bg-black border border-white rounded-lg">
+                    <div class="p-3 bg-gray-800 border border-gray-600 rounded-lg">
                         <div class="flex justify-between items-start">
                             <span class="font-semibold text-sm text-white">${comet.object_name}</span>
-                            <span class="text-xs text-white">e=${comet.e.toFixed(3)}</span>
+                            <span class="text-xs text-gray-300">e=${comet.e.toFixed(3)}</span>
                         </div>
-                        <div class="text-xs text-white mt-1">
+                        <div class="text-xs text-gray-300 mt-1">
                             <span>i: ${comet.i_deg.toFixed(1)}°</span>
                             <span class="ml-2">q: ${comet.q_au_1.toFixed(3)} AU</span>
                             <span class="ml-2">P: ${comet.p_yr.toFixed(1)} yr</span>
@@ -3084,10 +2376,10 @@ async function loadCometData() {
                 `).join('')}
             </div>
             
-            <div class="mt-3 p-3 bg-black border border-white rounded-lg text-xs text-white">
-                <p><strong>Demo Mode:</strong> Showing all ${demoComets.length} famous comets</p>
+            <div class="mt-3 p-3 bg-gray-800 border border-gray-600 rounded-lg text-xs text-gray-300">
+                <p><strong>Demo Mode:</strong> Showing famous comets</p>
                 <p>e=eccentricity, i=inclination, q=perihelion distance, P=orbital period</p>
-                <button onclick="loadCometData()" class="mt-2 px-3 py-1 bg-white hover:bg-black text-black hover:text-white rounded text-xs transition">
+                <button onclick="loadCometData()" class="mt-2 px-3 py-1 bg-cyan-600 hover:bg-cyan-700 rounded text-white text-xs transition">
                     <i data-lucide="refresh-cw" class="w-3 h-3 inline mr-1"></i>
                     Retry NASA Data
                 </button>

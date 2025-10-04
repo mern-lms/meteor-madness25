@@ -95,27 +95,25 @@ class RegionalImpactMapper {
         container.className = 'fixed inset-0 bg-black/90 z-50 hidden';
         container.innerHTML = `
             <div class="h-full flex flex-col">
-                <div class="bg-gray-900 border-b border-gray-700 p-3 sm:p-4">
-                    <div class="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
-                        <div>
-                            <h2 class="text-lg sm:text-xl font-bold text-white orbitron">🌍 Regional Impact Analysis</h2>
-                            <p class="text-gray-400 text-xs sm:text-sm mt-1">Click anywhere on the map to simulate impact location</p>
+                <div class="bg-gray-900 border-b border-gray-700 p-4 flex justify-between items-center">
+                    <div>
+                        <h2 class="text-xl font-bold text-white orbitron">🌍 Regional Impact Analysis</h2>
+                        <p class="text-gray-400 text-sm">Click anywhere on the map to simulate impact location</p>
+                    </div>
+                    <div class="flex items-center space-x-4">
+                        <div class="flex items-center space-x-2">
+                            <label class="text-white text-sm">Show:</label>
+                            <select id="impact-layer-select" class="bg-gray-800 text-white px-2 py-1 rounded text-sm">
+                                <option value="all">All Effects</option>
+                                <option value="crater">Crater Only</option>
+                                <option value="blast">Blast Zones</option>
+                                <option value="seismic">Seismic Effects</option>
+                                <option value="population">Population Risk</option>
+                            </select>
                         </div>
-                        <div class="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4">
-                            <div class="flex items-center gap-2">
-                                <label class="text-white text-xs sm:text-sm">Show:</label>
-                                <select id="impact-layer-select" class="bg-gray-800 text-white px-2 py-1 rounded text-xs sm:text-sm">
-                                    <option value="all">All Effects</option>
-                                    <option value="crater">Crater Only</option>
-                                    <option value="blast">Blast Zones</option>
-                                    <option value="seismic">Seismic Effects</option>
-                                    <option value="population">Population Risk</option>
-                                </select>
-                            </div>
-                            <button id="close-regional-map" class="bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded text-sm self-end sm:self-auto">
-                                ✕ Close
-                            </button>
-                        </div>
+                        <button id="close-regional-map" class="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded">
+                            ✕ Close
+                        </button>
                     </div>
                 </div>
                 
