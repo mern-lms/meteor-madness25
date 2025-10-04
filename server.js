@@ -5,13 +5,13 @@ const path = require('path');
 require('dotenv').config();
 
 const app = express();
-const PORT = 8080;
+const PORT = process.env.PORT || 3000;
 const NASA_API_KEY = process.env.NASA_API_KEY || 'DEMO_KEY';
 
 // Middleware
 app.use(cors());
 app.use(express.json());
-// Removed static file serving - this is now API-only server
+app.use(express.static('public'));
 
 // NASA NEO API Base URL
 const NASA_NEO_BASE = 'https://api.nasa.gov/neo/rest/v1';
@@ -767,9 +767,8 @@ app.get('/api/nasa/comets', async (req, res) => {
         
         const response = await axios.get(url, {
             params: {
-                '$limit': 200 // Increased limit to get more comets
-            },
-            timeout: 30000 // 30 second timeout
+                '$limit': 50 // Limit results for performance
+            }
         });
         
         // Process comet data
@@ -798,14 +797,7 @@ app.get('/api/nasa/comets', async (req, res) => {
         });
     } catch (error) {
         console.error('Error fetching comet data:', error.message);
-        
-        if (error.code === 'ETIMEDOUT' || error.code === 'ECONNABORTED') {
-            console.error('NASA API timeout - network connectivity issue');
-        } else if (error.code === 'ENOTFOUND') {
-            console.error('NASA API not reachable - DNS/network issue');
-        } else {
-            console.error('Full error:', error);
-        }
+        console.error('Full error:', error);
         
         // Provide fallback demo data
         const demoComets = [
